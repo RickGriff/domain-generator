@@ -13,7 +13,7 @@ load_dotenv()
 # If modifying the scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
-SPREADSHEET_ID = os.getenv("SPREADSHEET_ID") 
+SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 
 # Boilerplate authorization function for Sheets API
 def authorize_and_get_credentials():
@@ -37,12 +37,12 @@ def authorize_and_get_credentials():
             pickle.dump(creds, token)
     return creds
 
-## DOMAIN NAME GENERATOR METHODS
+# DOMAIN NAME GENERATOR FUNCTIONS
 
 # Transform a list rows into a list of columns
 def get_columns(table):
     num_cols = len(table[0])
-    cols = [ [] for i in range(num_cols) ]
+    cols = [[] for i in range(num_cols)]
 
     for row in table:
         for (idx, cell) in enumerate(row):
@@ -63,16 +63,17 @@ def combine_two(list_1, list_2):
 def gen_domains(col_a, col_b):
     col_1 = col_a[:]
     col_2 = col_b[:]
- 
+
     title_1 = col_1.pop(0)
     title_2 = col_2.pop(0)
 
     domains_title = "{}+{}".format(title_1, title_2)
     domains = combine_two(col_1, col_2)
 
-    domains_rows = [domains[i:i+8] for i in range(0, len(domains), 8)] # Convert to array of 8-column rows 
-    domains_rows.insert(0, [domains_title]) 
-    domains_rows.append([""] * 8) # append an empty row after data
+    # Convert to array of 8-column rows
+    domains_rows = [domains[i:i+8] for i in range(0, len(domains), 8)]
+    domains_rows.insert(0, [domains_title])
+    domains_rows.append([""] * 8)  # append an empty row after data
 
     return domains_rows
 
@@ -83,12 +84,12 @@ def gen_all_combos(columns):
         for col_j in columns:
             if col_i != col_j:
                 combo = gen_domains(col_i, col_j)
-                domains += combo # add the *contents* of combo list to domains list
+                domains += combo  # add the *contents* of combo list to domains list
     return domains
 
 def make_timestamp():
     time_now = time.localtime(time.time())
-    
+
     time_string = "{}:{}:{} {}-{}-{}".format(
         time_now.tm_hour,
         time_now.tm_min,
@@ -96,22 +97,23 @@ def make_timestamp():
         time_now.tm_mday,
         time_now.tm_mon,
         time_now.tm_year
-        )
-
+    )
     return time_string
 
 def get_input_range():
-    input_sheet = input("Please enter an input sheet. Leave blank for default 'RawTerms' sheet.  ")
-    input_range = input("Please enter an input range. Leave blank for the default range - A1:H50.  ")
+    input_sheet = input(
+        "Please enter an input sheet. Leave blank for default 'RawTerms' sheet.  ")
+    input_range = input(
+        "Please enter an input range. Leave blank for the default range - A1:H50.  ")
 
     if input_sheet == "":
         input_sheet = "RawTerms"
-    
+
     if input_range == "":
         input_range = "A1:A50"
-    
+
     input_sheet_and_range = "{}!{}".format(input_sheet, input_range)
-    return input_sheet_and_range     
+    return input_sheet_and_range
 
 def make_new_sheet(sheet_service, spreadsheet_id, sheet_name):
   # 'requests' in the Sheets API are individual operations to perform on the spreadsheet.
@@ -138,6 +140,8 @@ def make_new_sheet(sheet_service, spreadsheet_id, sheet_name):
         body=data).execute()
     return response
 
+## RUN THE SCRIPT
+
 def main():
     creds = authorize_and_get_credentials()
     service = build('sheets', 'v4', credentials=creds)
@@ -147,7 +151,8 @@ def main():
     input_range = get_input_range()
 
     # Grab the raw input table from the sheet via GET request
-    result = sheet_service.values().get(spreadsheetId = SPREADSHEET_ID, range="RawTerms2!A1:H50").execute()
+    result = sheet_service.values().get(spreadsheetId=SPREADSHEET_ID,
+                                        range="RawTerms2!A1:H50").execute()
     input_table = result.get('values', [])
 
     columns = get_columns(input_table)
@@ -158,23 +163,22 @@ def main():
     # Make new sheet that will receive output
     current_time = make_timestamp()
     new_sheet_name = "GenDom {}".format(current_time)
-    make_new_sheet(sheet_service, spreadsheet_id, new_sheet_name) # POST request to Sheets API 
+    # POST request to Sheets API
+    make_new_sheet(sheet_service, spreadsheet_id, new_sheet_name)
 
     # POST the data to the new sheet
     output_range = "{}!A1:H10000".format(new_sheet_name)
-    data = {  'range': output_range, 'values': all_domains}
-    
+    data = {'range': output_range, 'values': all_domains}
+
     response = sheet_service.values().update(
-    spreadsheetId=spreadsheet_id, range=output_range,
-    valueInputOption='RAW', body=data).execute()
+        spreadsheetId=spreadsheet_id, range=output_range,
+        valueInputOption='RAW', body=data).execute()
 
-    sheet_created = response['updatedRange']
+    updated_sheet = response['updatedRange']
 
     print('\n')
-    print( "Domain names added to following sheet:  {}".format(sheet_created) )
+    print("Domain names added to following sheet:  {}".format(updated_sheet))
     print('\n')
-    # print(response)
 
 if __name__ == '__main__':
     main()
-
